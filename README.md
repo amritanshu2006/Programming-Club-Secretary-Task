@@ -1,21 +1,21 @@
-# Detailed Write - up on Capturing the flag: 
+# Detailed Write-up on Capturing the flag: 
 
-## Step - 1: Finding the name of the suspected co - ordinator: 
-Searched inside the P - Club members and the members of the Wired - in, a name common in both was of `Ketan`. He was having two git - hub accounts, but as per the problem statement there was something pushed, then searched for the recent changes and found `0xc1ph3rf0x` as the suspected git account. 
+## Step - 1: Finding the name of the suspected coordinator: 
+Searched inside the P - Club members and the members of the Wired-In, a name common in both was of `Ketan`. He was having two GitHub accounts, but as per the problem statement there was something pushed, then searched for the recent changes and found `0xc1ph3rf0x` as the suspected git account. 
 
-Runned the `python3 sherlock 0xc1ph3rf0x` to see where else this handle is registered across the internet. This confirmed that there is only one target repository. 
+Ran the `python3 sherlock 0xc1ph3rf0x` to see where else this handle is registered across the internet. This confirmed that there is only one target repository. 
 
 ## Step - 2 : Searching for the history of the commit: 
 Grabbed the public event history for the 0xc1ph3rf0x account. We will use curl to fetch it and jq (a command-line JSON processor) to format it so it's readable.
 
 `curl -s https://api.github.com/users/0xc1ph3rf0x/events/public | jq . > suspect_events.json` - By this command the raw data saved in `suspect_events.json`.
 
-## Step - 3: Start random searching for the flag, inside the raw file: 
+## Step - 3: Starting random searches for the flag, inside the raw file: 
 First used the grep command for the search of the flag. 
 `grep -i "pclub{" suspect_events.json`
-This search din't gave anything as the output. 
+This search didn't gave anything as the output. 
 
-Then, runned this `jq` command for print out exactly what repository they touched and the payload (the details of what they created):
+Then, ran this `jq` command for print out exactly what repository they touched and the payload (the details of what they created):
 `jq '.[0] | {Repository: .repo.name, What_Was_Created: .payload.ref_type, Name: .payload.ref, Description: .payload.description}' suspect_events.json`
 
 This gave me the following details: 
@@ -26,43 +26,35 @@ This gave me the following details:
   "Description": null
 }`
 
-Then, used for the entire seraching in the repository, `git grep "pclub{" $(git rev-list --all)`
+Then, used for the entire searching in the repository, `git grep "pclub{" $(git rev-list --all)`
 Then, Inspected the Patch History. `git log -p`
 Then, opened the hidden file - `cat .git/config`. found the following: 
 
 `pack-refs with: peeled fully-peeled sorted 
 67082fd69354b1f510a383684bdee9e911a5d8c6 refs/remotes/origin/master`
 
-## Step - 4: Hunt for the Encoded flag and file: 
-1. Seached for - `grep -ri "cGNsdWJ"` .
-2. Inspected the Entire Branch History - `git log -p`
+## Step - 4: Hunting for the Encoded Flag and file: 
+1. Searched for - `grep -ri "cGNsdWJ"` .
+2. Inspected the entire branch history - `git log -p`
 3. Searched for all the historical file content - `git log --all -S "cGNsdWJ" -p`
 
-Then, tried to found in terms of hexdecimal conversion and ROT 13.
+Then, tried to found in terms of hexadecimal conversion and ROT 13.
 
 ## Step - 5: Connecting from the hint: 
 "Another signal was left entirely off-system. It bypassed our web logs because it was never an HTTP request. It was buried at the edge of our perimeter, sitting out there in the open."
 
 "The DNS guy" + "bypassed web logs" + "edge of our perimeter" = Domain Name System (DNS) Records. - `dig TXT wiredin.pclub.in`
 
-Then, found something ground breaking. Inside the TXT of wiredin.pclub.in found the following lines: 
+Then, found something groundbreaking. Inside the TXT of wiredin.pclub.in found the following lines: 
 
-"Found this insane playlist the other day while digging through some stuff.\010Curator: `bhopinder jogi\010Link: https://open.spotify.com/playlist/5iK4rR41V1DSqTot2JO15f?si=oEIMe-TLTGiOPetf50R71w\010Perfect` for late night CTFs sessions."
+"Found this insane playlist the other day while digging through some stuff.\010Curator: `bhopinder jogi\010Link: https://open.Spotify.com/playlist/5iK4rR41V1DSqTot2JO15f?si=oEIMe-TLTGiOPetf50R71w\010Perfect` for late-night CTF sessions."
 
-Then, after a bit of reasearch on the spotify found a profile under bhopinder jogi, the name of the playlist comes as whoami.
-## Step - 6: Seach around the spotify
-
+Then, after a bit of research on the Spotify found a profile under bhopinder jogi, the name of the playlist comes as whoami.
+## Step - 6: Search around the Spotify
 
 Had to write the things. 
 
-
-
-
-
-
-
-
-Then, found a link that lead towrads the terminal of the p - club - `RECJAIL.PCLUB.IN`
+Then, found a link that lead towards the terminal of the p - club - `RECJAIL.PCLUB.IN`
 
 https://github.com/Ketan-Agarwal Repositories were inspected for: recent commits runtime tooling
 network references suspicious modifications 3. Cloning and Investigating ctf-agent Commands used:
@@ -111,10 +103,6 @@ pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l} The binary protected only the visible t
 failed to secure the fully resolved filesystem object. 16. Current Status Completed: OSINT phase
 Hidden content discovery Restricted shell analysis SUID exploitation ProcFS abuse Root flag extraction
 Next stage pivot: 168.144.73.17:8003 analyst / Fr8_4nalyst!
-
-
-
-
 
 # Detailed CTF Chronology & Sandbox Environment Profile: Recjail
 
