@@ -416,7 +416,7 @@ revealed:
 
 ---
 
-# Step 44 — Identifying a Suspicious Shipment - This was also visible and found after loging on to the website. (From this point to the finding of the third flag I also used ChatGPT)
+## Identifying a Suspicious Shipment - This was also visible and found after loging on to the website. (From this point to the finding of the third flag I also used ChatGPT)
 
 One shipment stood out:
 
@@ -470,7 +470,7 @@ PCLUB{m4st3r_0f_th3_fr31ght_n3tw0rk}
 
 ---
 
-# Step 48 — Exploring Additional Internal Endpoints
+## Exploring Additional Internal Endpoints
 
 Tested:
 - `/internal/debug`
@@ -483,7 +483,7 @@ All returned:
 
 ---
 
-# Step 49 — Testing SSTI
+## Testing SSTI
 
 Payload:
 
@@ -495,7 +495,7 @@ No SSTI observed.
 
 ---
 
-# Step 50 — Testing SSRF
+## Testing SSRF
 
 Payload:
 
@@ -507,7 +507,7 @@ No additional disclosure observed.
 
 ---
 
-# Step 51 — Performing Infrastructure Enumeration
+## Performing Infrastructure Enumeration
 
 Scanning:
 
@@ -521,7 +521,7 @@ revealed:
 
 ---
 
-# Step 52 — Investigating Port 8008
+## Investigating Port 8008
 
 Port 8008:
 - accepted TCP connections,
@@ -544,7 +544,7 @@ produced:
 
 ---
 
-# Step 54 — Monitoring Traffic Using tcpdump
+## Monitoring Traffic Using tcpdump
 
 Traffic monitoring:
 
