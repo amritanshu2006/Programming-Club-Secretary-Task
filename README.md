@@ -1476,3 +1476,34 @@ Use:
 to reconstruct valid path.
 
 ---
+
+# Out of the Way Finding of the Flag
+
+During the initial stages of the flag-hunting journey, the investigation started from the main GitHub account of the current coordinator and the head of the Wired-In team.
+
+---
+
+## Step - 1: Finding the Suspected Git Account
+
+Started searching for recent changes, but initially found nothing that had been recently changed or deleted inside the GitHub account `Ketan-Agarwal`.
+
+---
+
+## Step - 2: Investigating the Organization Website
+
+Found the website of the `P - Club`:
+
+`https://pclub.in/`
+
+Performed further investigation inside the website and explored the Information Security Roadmap section.
+
+---
+
+## Step - 3: Searching for the `pclub{}` Flag
+
+After searching through the webpage, one of the flags was discovered directly inside the webpage itself.
+
+The following screenshot shows the fifth flag:
+
+![image alt](https://github.com/amritanshukumar2006-collab/Programming-Club-Secretary-Task/blob/438298ebc1cbfc4f2373232de27f48f9747a0b1e/Screenshot%20From%202026-05-26%2004-38-21.png)
+
