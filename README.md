@@ -795,7 +795,7 @@ Tried hitting each individually:
 # /shipments/AMS-DEC01  → 404
 ```
 
-Only `BERLIN-NOV07` had previously returned flag 3. Others were dead ends.
+Only `BERLIN-NOV07` had previously returned flag 3. Others were dead ends, as mentioned and discussed earlier also. 
 
 ---
 
@@ -817,7 +817,7 @@ dig -x 168.144.73.17       # DigitalOcean hosted, no PTR record
 
 ## Step 12: GitHub Repository Deep Dive
 
-Explored the full `0xC1ph3rF0x/infosec-notes` repository commit history:
+Explored the full `0xC1ph3rF0x/infosec-notes` repository commit history, to check once again for any sort or any kind of hint that may be present inside the repository:
 
 ```bash
 curl -s https://api.github.com/repos/0xC1ph3rF0x/infosec-notes/commits | jq '.[].sha'
@@ -852,7 +852,7 @@ printf 'analyst:Fr8_4nalyst!\n' | nc -w 3 168.144.73.17 8008
 
 ## Step 14: Back to the nsjail Shell — SUID Enumeration
 
-Returned to the web terminal at `recjail.pclub.in` and ran:
+Returned to the web terminal at `recjail.pclub.in` and ran. As I remembered that along with the loggin in credentials some information in the form of the matrix was also mentioned, which was not used till now: (From this point to the finding of the fourth flag also used Claude AI, as an assistant): - 
 
 ```bash
 find / -perm -4000 2>/dev/null
@@ -1042,36 +1042,437 @@ The flag `7ikt0k_3_nic3r` is a leet-speak version of **"tiktoken is nicer"** —
 
 ---
 
-## Summary of the Attack Chain
+## Steps taken after finding of the fourth flag: - 
 
+## Step 1: Exploring the link along with the fourth flag: - 
+
+After finding of the fourth flag, I also got a link in below `https://tinyurl.com/3hxbe2d8 `. The link redirects to the following git hub gist: - 
+**Command:** `https://gist.githubusercontent.com/shivam-0806/1dc097c5b06030e8e3cc9c8a6adc0fa5/raw/c819f0b3802b4c129d4a93a6ffe90bee3b6a0225/dylan.txt`
+
+## Step 2: Download the file named as `dylan.txt`. 
+**Command:** `wget -O stage5_binary https://tinyurl.com/3hxbe2d8`
+
+## Step 3:  Identifying File Type. 
+
+`
+file stage5_binary
+# Result: ASCII text, with very long lines (65536), with no line terminators
+head -c 200 stage5_binary
+# Result: f0VMRg... (base64 encoded ELF binary)
+`
+
+**Conclusion:** Base64 encoded Linux ELF binary.
+
+## Step 4: Decoding the Binary - The first thought came of the conversion by the base 64: 
+
+`
+base64 -d stage5_binary > stage5_elf
+file stage5_elf
+# Result: ELF 64-bit LSB executable, x86-64, statically linked, Go BuildID=...
+`
+
+**Conclusion:** 64-bit Go executable.
+
+## Step 4: Running the Binary
+
+`
+chmod +x stage5_elf
+./stage5_elf
+`
+
+The screenshot below is the description of the output of running the above command: - 
+
+![image alt](https://github.com/amritanshukumar2006-collab/Programming-Club-Secretary-Task/blob/17846c1a602a5a49d36e581b86493fbd31854052/Screenshot%20From%202026-05-26%2004-08-36.png)
+
+## Step 5: Probing Inputs
+Tested various inputs inside the executable programm:
+
+| Input | Length | Response |
+|-------|--------|----------|
+| `help`, `north`, `south` | 4-5 | `Invalid trajectory` |
+| `w`, `a`, `s`, `d` | 1 | `Invalid parameter length` |
+| `DDDD` | 4 | `Invalid trajectory` |
+| `RRRRR` | 5 | `Invalid trajectory` |
+| `DDDDDDDD` | 8 | `Invalid parameter length` |
+| `DDDDRRRRUUUURRRR` | 16 | `Invalid parameter length` |
+
+**Conclusion:** Valid input length = **4 or 5 characters**.
+
+---
+
+## Step 6: Key Strings Found in Binary
+```bash
+strings stage5_elf | grep -i "invalid\|trajectory\|output\|connection"
 ```
-flag.txt (root) via secure_reader + procfs pivot
-    └── Hidden token array appended to file
-        └── Recognized as cl100k_base ChatML token IDs
-            └── Installed tiktoken locally
-                └── Decoded user-turn tokens
-                    └── pclub{7ikt0k_3_nic3r} + next stage URL
+**Important strings found:**
+- `Initialize connection...`
+- `Invalid trajectory`
+- `Invalid parameter length`
+- `[+] Output: %s` ← prints a string variable (the flag!)
+- `[+] Target reached. Verifying path integrity...`
+- `[-] Collision detected: Path blocked.`
+- `[-] Signal lost: Out of bounds.`
+- `[-] Decryption failed: Size mismatch.`
+
+**Internal functions:**
+- `main.main`
+- `main.initRawMaze`
+- `main.func`
+
+---
+
+## Step 7: Discovering It's Multi-Input
+Used Python to probe input structure:
+```python
+import subprocess
+for length in range(1, 20):
+    path = 'D' * length
+    proc = subprocess.run(['./stage5_elf'], input=path+'\n', capture_output=True, text=True, timeout=5)
+    output = proc.stdout.strip()
+    print(f'Length {length}: {repr(output)}')
+```
+**Discovered:** Program takes **at least 2 inputs**, then shows `[+] Output:`.
+
+---
+
+## Step 8: Brute Force Attempts — FAILED
+Tried all 256 combinations of U/D/L/R at length 4 → nothing different.
+Tried all 1024 combinations at length 5 → nothing different.
+Tried all 256 NSEW combinations at length 4 → nothing different.
+
+**Conclusion:** Either wrong character set or the path is not the key factor.
+
+---
+
+## Step 9: Maze Extraction
+Found 1704-bit binary string inside the ELF:
+```python
+import re
+with open('stage5_elf', 'rb') as f:
+    data = f.read()
+text = data.decode('latin-1')
+matches = re.findall(r'[01]{100,}', text)
+# Found 1 match: length=1704
+```
+Visualized as 24×71 grid — shows diagonal wall pattern from top-right to bottom-left.
+
+---
+
+## Step 10: strace Analysis — KEY DISCOVERY
+```bash
+strace -e trace=connect,socket,bind ./stage5_elf <<< $'DDDD\nDDDD\n' 2>&1
+```
+**Result:**
+- **NO network connections made** — only SIGURG signals (Go runtime internal)
+- Binary is **purely local**, not connecting to `168.144.73.17:8003`
+- **THREE inputs confirmed** at end of strace output:
+```
+Initialize connection...
+> Invalid trajectory      ← input 1 (length 4-5)
+> Invalid trajectory      ← input 2 (length 4-5)
+> Invalid parameter length ← input 3 (empty = wrong length)
+> [+] Output:
 ```
 
 ---
 
-## Key Techniques Used
+# Important Static Addresses Identified
+(From this point I took the assistance from ChatGPT for the finding of the further flag: - )
 
-| Technique | Application |
-|-----------|-------------|
-| ProcFS pivot via symlink | Bypassing `secure_reader` path restrictions |
-| SUID binary abuse | Reading root-owned files as `ctf_user` |
-| Token ID recognition | Identifying cl100k_base ChatML format |
-| tiktoken decoding | Extracting the flag from integer token array |
+## Sections
 
----
-
-## Next Stage
-
-The decoded message pointed to: `https://tinyurl.com/3hxbe2d8`
-
-This URL leads to a GitHub Gist containing a large block of base64-encoded data — the starting point for the fifth flag investigation.
+```text
+.text       : 0x401000 - 0x4a2b51
+.rodata     : 0x4a3000 - 0x4d9d62
+.data       : 0x587200 - 0x58c972
+.bss        : 0x58c980 - 0x5ace58
+.noptrbss   : 0x5ace60 - 0x5c2420
+```
 
 ---
 
-*Write-up covers the complete investigation from flag 3 completion through flag 4 capture, including all failed enumeration attempts across GitHub, DNS, internal API endpoints, network scanning, and port 8008 probing.*
+# Key Functions Identified
+
+## Validation / trajectory path
+
+### 0x452a20
+
+Observed after entering:
+```text
+LUUL
+```
+
+Disassembly:
+
+```asm
+0x452a20: test %rax,%rax
+0x452a23: je 0x452ad7
+0x452a29: call 0x4559e0
+```
+
+This appears to:
+- validate parsed movement structure,
+- branch to failure cleanup on invalid path.
+
+---
+
+## 0x41c360
+
+Initially believed to be maze validator.
+
+Later determined:
+- heavily reused internally,
+- triggered during runtime initialization,
+- unsuitable for direct breakpointing.
+
+---
+
+## 0x41c3f7
+
+Observed in stack trace after real user input.
+
+Likely:
+- movement parser,
+- graph traversal stage,
+- or state transition handler.
+
+---
+
+## 0x425e16
+
+Appears in real input-processing stack traces.
+
+Likely:
+- higher-level validation dispatcher.
+
+---
+
+# Important Memory Regions
+
+## Transition / movement mask
+
+Address:
+
+```text
+0x582820
+```
+
+Dump:
+
+```text
+0x582820: 00 01 00 00 01 01 00 00
+0x582828: 00 00 00 00 00 00 00 00
+0x582838: 00 00 00 00 00 01 00 00
+0x582840: 01 01 01 01 01 01 00 00
+...
+```
+
+Interpretation:
+- likely directional adjacency mask,
+- movement validity table,
+- or graph transition bitmap.
+
+---
+
+# Runtime Heap Structures
+
+Several linked runtime-managed structures were explored:
+
+Examples:
+
+```text
+0x291cc2d80008
+0x291cc2d37008
+0x291cc2d80808
+```
+
+These appeared to be:
+- Go runtime heap descriptors,
+- scheduler metadata,
+- object containers,
+- not actual maze nodes.
+
+Conclusion:
+- heap chasing was largely noise.
+
+---
+
+# Important Dynamic Analysis Results
+
+## Catching syscall read
+
+Used:
+
+```gdb
+catch syscall read
+```
+
+Observed actual input buffer:
+
+```text
+"LUUL\n"
+```
+
+Important stack trace:
+
+```text
+#12 0x43169c
+#17 0x425e16
+#20 0x41cabe
+```
+
+These are likely connected to:
+- movement validation,
+- graph traversal,
+- or parser dispatch.
+
+---
+
+## Catching syscall write
+
+Used:
+
+```gdb
+catch syscall write
+```
+
+Observed actual output buffer:
+
+```text
+"Invalid trajectory\n"
+```
+
+Important backtrace:
+
+```text
+#12 0x43169c
+#22 0x49501b
+#30 0x49725f
+#33 0x4784c5
+```
+
+This confirms:
+- failure branch reached,
+- validator successfully interceptable.
+
+---
+
+# Key Disassembly
+
+## Around 0x43169c
+
+```asm
+0x43169c: mov 0x40(%rsp), %rcx
+0x4316a1: mov 0x98(%rcx), %rdx
+0x4316a8: cmp %rdx, %rax
+0x4316ab: jbe 0x431726
+```
+
+This region:
+- performs bounds/trajectory comparisons,
+- manipulates graph/state values,
+- likely participates in path validation.
+
+---
+
+# Major Conclusions
+
+## Confirmed
+
+- Input is parsed into movement instructions.
+- Commands are validated against trajectory rules.
+- There exists a graph/state transition system.
+- Invalid paths explicitly trigger:
+  Invalid trajectory
+- Command length is validated separately.
+
+---
+
+# Problems Encountered
+
+## Go Runtime Noise
+
+Major difficulty:
+- breakpoints triggered continuously inside:
+  - scheduler,
+  - memory allocator,
+  - runtime read/write wrappers.
+
+This caused:
+- disappearing input cursor,
+- debugger ownership of stdin,
+- repeated false-positive breakpoints.
+
+---
+
+# Effective Debugging Techniques Found
+
+## Good
+
+```gdb
+catch syscall read
+catch syscall write
+```
+
+These correctly intercepted:
+- real stdin,
+- real output generation.
+
+---
+
+## Bad
+
+```gdb
+break *0x41c360
+```
+
+Triggered excessively during initialization.
+
+---
+
+# Current Best Hypothesis
+
+The intended solution likely involves:
+
+1. reconstructing valid graph traversal,
+OR
+2. patching/inverting validation branch.
+
+Most promising target regions:
+
+```text
+0x41c3f7
+0x425e16
+0x43169c
+0x452a20
+```
+
+---
+
+# Suggested Next Steps
+
+## Option 1 — Branch Patching
+
+Identify:
+
+```asm
+je invalid
+jne invalid
+```
+
+near:
+- `Invalid trajectory` print path,
+- then invert or NOP branch.
+
+---
+
+## Option 2 — Graph Reconstruction
+
+Use:
+- movement mask at `0x582820`,
+- dynamic state transitions,
+- parser stack traces,
+
+to reconstruct valid path.
+
+---
