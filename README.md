@@ -13,7 +13,7 @@ Grabbed the public event history for the 0xc1ph3rf0x account. We will use curl t
 ## Step - 3: Starting random searches for the flag, inside the raw file: 
 First used the grep command for the search of the flag. 
 `grep -i "pclub{" suspect_events.json`
-This search didn't gave anything as the output. 
+This search didn't give anything as the output. 
 
 Then, ran this `jq` command for print out exactly what repository they touched and the payload (the details of what they created):
 `jq '.[0] | {Repository: .repo.name, What_Was_Created: .payload.ref_type, Name: .payload.ref, Description: .payload.description}' suspect_events.json`
@@ -38,7 +38,7 @@ Then, opened the hidden file - `cat .git/config`. found the following:
 2. Inspected the entire branch history - `git log -p`
 3. Searched for all the historical file content - `git log --all -S "cGNsdWJ" -p`
 
-Then, tried to found in terms of hexadecimal conversion and ROT 13.
+Then, tried to find in terms of hexadecimal conversion and ROT 13.
 
 ## Step - 5: Connecting from the hint: 
 "Another signal was left entirely off-system. It bypassed our web logs because it was never an HTTP request. It was buried at the edge of our perimeter, sitting out there in the open."
@@ -356,7 +356,7 @@ Response:
 
 ---
 
-## Now, moving towards the dicovery of the third flag, checking the API Documentation
+## Now, moving towards the discovery of the third flag, checking the API Documentation
 
 Further exploration revealed:
 
@@ -416,7 +416,7 @@ revealed:
 
 ---
 
-# Step 44 — Identifying a Suspicious Shipment - This was also visible and found after logging on to the website. (From this point to the fidning of the third flag I also used ChatGPT)
+# Step 44 — Identifying a Suspicious Shipment - This was also visible and found after loging on to the website. (From this point to the finding of the third flag I also used ChatGPT)
 
 One shipment stood out:
 
@@ -852,7 +852,7 @@ printf 'analyst:Fr8_4nalyst!\n' | nc -w 3 168.144.73.17 8008
 
 ## Step 14: Back to the nsjail Shell — SUID Enumeration
 
-Returned to the web terminal at `recjail.pclub.in` and ran. As I remembered that along with the loggin in credentials some information in the form of the matrix was also mentioned, which was not used till now: (From this point to the finding of the fourth flag also used Claude AI, as an assistant): - 
+Returned to the web terminal at `recjail.pclub.in` and ran. As I remembered that along with the login in credentials some information in the form of the matrix was also mentioned, which was not used till now: (From this point to the finding of the fourth flag also used Claude AI, as an assistant): - 
 
 ```bash
 find / -perm -4000 2>/dev/null
@@ -1085,7 +1085,7 @@ The screenshot below is the description of the output of running the above comma
 ![image alt](https://github.com/amritanshukumar2006-collab/Programming-Club-Secretary-Task/blob/17846c1a602a5a49d36e581b86493fbd31854052/Screenshot%20From%202026-05-26%2004-08-36.png)
 
 ## Step 5: Probing Inputs
-Tested various inputs inside the executable programm:
+Tested various inputs inside the executable program:
 
 | Input | Length | Response |
 |-------|--------|----------|
