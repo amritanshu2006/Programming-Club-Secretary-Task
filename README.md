@@ -1507,3 +1507,30 @@ The following screenshot shows the fifth flag:
 
 ![image alt](https://github.com/amritanshukumar2006-collab/Programming-Club-Secretary-Task/blob/438298ebc1cbfc4f2373232de27f48f9747a0b1e/Screenshot%20From%202026-05-26%2004-38-21.png)
 
+# Conculsion
+
+After completing the entire investigation and solving process, along with assistance from various LLM tools during different stages of analysis and debugging, the following flags were successfully discovered throughout the challenge journey:
+
+pclub{0_n0f0ll0w_0nly_pr0t3ct5_th3_t41l}
+PCLUB{5muggl1ng_ch41n_unl0ck3d}
+PCLUB{m4st3r_0f_th3_fr31ght_n3tw0rk}
+pclub{7ikt0k_3_nic3r}
+pclub{CTFs_ar3_fun!}
+
+The complete solving process involved multiple stages of reconnaissance, GitHub investigation, DNS analysis, web exploitation, sandbox escaping, request smuggling, privilege escalation, reverse engineering, binary analysis, tokenizer decoding, and infrastructure enumeration.
+
+The challenge provided practical exposure to several cybersecurity concepts, including:
+
+OSINT (Open-Source Intelligence)
+DNS Reconnaissance
+HTTP Request Smuggling
+ProcFS Exploitation
+SUID-Based Privilege Escalation
+Sandbox Escape Techniques
+Reverse Engineering
+Binary Debugging with GDB
+Token Encoding and Decoding
+Network Enumeration
+Web Security Testing
+
+Overall, the challenge was highly engaging and offered valuable hands-on learning experience across multiple domains of Information Security and CTF problem-solving methodologies.
